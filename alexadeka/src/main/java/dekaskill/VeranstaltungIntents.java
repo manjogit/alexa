@@ -38,7 +38,7 @@ public class VeranstaltungIntents {
           		}
     		}
       		
-      		return SpeechletResponse.newAskResponse(speech, createRepromptSpeech());
+      		return SpeechletResponse.newTellResponse(speech);
       	}
     
     public SpeechletResponse handleVeranstaltungsFrage(){
@@ -47,7 +47,7 @@ public class VeranstaltungIntents {
     	Begriff begriff = mapper.load(Begriff.class, "was");
     	
     	speech.setSsml("<speak>"+begriff.getText()+"</speak>");
-    	return SpeechletResponse.newAskResponse(speech, createRepromptSpeech());
+    	return SpeechletResponse.newTellResponse(speech);
     }
     
     public SpeechletResponse handleWitz(){
@@ -56,16 +56,7 @@ public class VeranstaltungIntents {
     	Begriff begriff = mapper.load(Begriff.class, "witz");
     	
     	speech.setSsml("<speak>"+begriff.getText()+"</speak>");
-    	return SpeechletResponse.newAskResponse(speech, createRepromptSpeech());
+    	return SpeechletResponse.newTellResponse(speech);
     }
-    
-    
-    private Reprompt createRepromptSpeech() {
-        PlainTextOutputSpeech repromptSpeech = new PlainTextOutputSpeech();
-        repromptSpeech.setText("Frag Alexa um Hilfe, falls du nicht weiter weisst.");
-        Reprompt reprompt = new Reprompt();
-        reprompt.setOutputSpeech(repromptSpeech);
-        return reprompt;
-                  }
-	
+
 }
