@@ -38,16 +38,12 @@ public class DekaAlexaSpeechlet implements Speechlet{
             private static final String INTENT_SHOW = "showRubrik";
             private static final String INTENT_REPEAT = "repeatRubrik";
             private static final String INTENT_POST_FACE = "postFacebook";
-            private static final String INTENT_PAUSE = "handlePause";
-            private static final String INTENT_VERANST = "handleVeranstaltung";
-            private static final String INTENT_VERANST_FRAGE = "handleVeranstaltungsFrage";
-            private static final String INTENT_VERANST_WITZ = "handleWitz";
+            private static final String UNHANDLED = "unhandledIntent";
             private static final Logger log = Logger.getLogger(DekaAlexaSpeechlet.class);
             private static final String[] WELLCOMES = {
-            											"Willkommen bei der Deka Anleger Welt."
-            											,"Deka Anleger Welt."
+            											"Willkommen beim Deka Alexa Skill."
             											,"Willkommen."
-            											,"Willkommen, Sie k�nnen gerne fragen welche Rubriken es gibt."
+            											,"Willkommen. Welche Rubrik möchten Sie hören?"
             										  };
             
             private static final String CHECK_USER = "checkUser"; 
@@ -58,7 +54,6 @@ public class DekaAlexaSpeechlet implements Speechlet{
             private HashMap<String, Rubrik> hMap = new HashMap<String,Rubrik>();
             private String themen;
             private static AmazonDynamoDB dbClient;
-            private VeranstaltungIntents veranstaltung;
              
  
             public SpeechletResponse onIntent(IntentRequest arg0, Session arg1) throws SpeechletException {
@@ -72,12 +67,6 @@ public class DekaAlexaSpeechlet implements Speechlet{
                         return handleChooseRubrik(intent,arg1);
                 } else if(INTENT_SHOW.equals(intentName)) {
                         return handleShowRubrik();
-                } else if(INTENT_VERANST_FRAGE.equals(intentName)){
-                		return veranstaltung.handleVeranstaltungsFrage();
-                } else if(INTENT_VERANST_WITZ.equals(intentName)){
-                		return veranstaltung.handleWitz();
-                } else if (INTENT_VERANST.equals(intentName)){
-                		return veranstaltung.handleVeranstaltung(intent,arg1);
                 } else if (INTENT_REPEAT.equals(intentName)) {
                         return handleRepeatRubrik(arg1);
                 } else if (INTENT_POST_FACE.equals(intentName)) {
@@ -86,26 +75,30 @@ public class DekaAlexaSpeechlet implements Speechlet{
                         return handleHelpIntent();
                 } else if ("AMAZON.StopIntent".equals(intentName)) {
                         return handleStopIntent();
-                } else if (INTENT_PAUSE.equals(intentName)){ 
-                		return handleStopIntent();
                 } else if ("AMAZON.CancelIntent".equals(intentName)){
                 		return handleStopIntent();
+                } else if ("AMAZON.NoIntent".equals(intentName)){
+                		return handleStopIntent();
+                } else if ("AMAZON.YesIntent".equals(intentName)){
+                		return handleFacebookPost(arg1);
+                } else if (UNHANDLED.equals(intentName)){
+            			return unhandledIntent();
                 } else {
-                        throw new SpeechletException("Invalid Intent");
+                        return unhandledIntent();
                 }
             }
  
             public SpeechletResponse onLaunch(LaunchRequest arg0, Session arg1) throws SpeechletException {
                         // TODO Auto-generated method stub
                 log.info("onLaunch requestId="+arg0.getRequestId()+", sessionId="+arg1.getSessionId());
-                int random = (int) (Math.random()*4);
+                int random = (int) (Math.random()*3);
                 SsmlOutputSpeech speech = new SsmlOutputSpeech();
                 //pruefen ob neuer user
                 if(arg1.getAttribute(CHECK_USER).equals("0")){
                 
                 	speech.setSsml("<speak><audio src=\"https://s3-eu-west-1.amazonaws.com/dekabucket/deka_alexa.mp3\" />"
-                					+ "Willkommen bei der Deka Anleger Welt. Sie k�nnen aus einen der folgenden Rubriken w�hlen: "+themen+" Falls Sie den Artikel ueber Facebook "
-                					+ "teilen m�chten, sagen Sie einfach: poste den Artikel.</speak>");
+                					+ "Willkommen bei der Deka Anleger Welt. Folgende Rubriken sind verfügbar: "+themen+" Falls Sie den Artikel über Facebook "
+                					+ "teilen möchten, sagen Sie einfach: poste den Artikel. Welche Rubrik möchten Sie hören?</speak>");
                 	
                     StandardCard card = new StandardCard();
                     Image image = new Image();
@@ -161,7 +154,7 @@ public class DekaAlexaSpeechlet implements Speechlet{
            
             private Reprompt createRepromptSpeech() {
                 PlainTextOutputSpeech repromptSpeech = new PlainTextOutputSpeech();
-                repromptSpeech.setText("Frag Alexa um Hilfe, falls du nicht weiter weisst.");
+                repromptSpeech.setText("Welche Rubrik möchten Sie wählen? oder Fragen Sie Alexa um Hilfe.");
                 Reprompt reprompt = new Reprompt();
                 reprompt.setOutputSpeech(repromptSpeech);
                 return reprompt;
@@ -169,17 +162,18 @@ public class DekaAlexaSpeechlet implements Speechlet{
              
            
             private SpeechletResponse handleChooseRubrik(Intent intent, Session session){
-                        PlainTextOutputSpeech speech = new PlainTextOutputSpeech();
+                        SsmlOutputSpeech speech = new SsmlOutputSpeech();
                         StandardCard card = new StandardCard();
                         Image image = new Image();
+                        String ask = " <break time=\"1s\"/>Möchten Sie den Artikel auf Ihrer Facebook Seite veröffentlichen?";
                        
                         if(intent.getSlot(INTENT_SLOT).getValue() == null){
-                               speech.setText("ich habe nicht verstanden welche rubrik sie gewaehlt haben");
+                               speech.setSsml("<speak>ich habe nicht verstanden welche rubrik sie gewählt haben.</speak>");
                         }else{
                                String rubrik = intent.getSlot(INTENT_SLOT).getValue().toString().toLowerCase();
                                if(rubrik.equals("zertifikate kolumne")){
                                    Rubrik zKol = hMap.get("zertifikate-kolumne");
-                                   speech.setText(zKol.getTitle()+". "+zKol.getText());
+                                   speech.setSsml("<speak>"+zKol.getTitle()+". "+zKol.getText()+ask+"</speak>");
                                    image.setSmallImageUrl(IMAGE_SRC+"Masri_720x480.jpg");
                                    image.setLargeImageUrl(IMAGE_SRC+"Masri_1200x800.jpg");
                                    zKol.setImageURL(IMAGE_SRC+"Masri_720x480.jpg");
@@ -190,7 +184,7 @@ public class DekaAlexaSpeechlet implements Speechlet{
                                               
                                }else if(rubrik.equals("katers welt")){
                                    Rubrik kWelt = hMap.get("katers welt");
-                                   speech.setText(kWelt.getTitle()+". "+kWelt.getText());
+                                   speech.setSsml("<speak>"+kWelt.getTitle()+". "+kWelt.getText()+ask+"</speak>");
                                    image.setSmallImageUrl(IMAGE_SRC+"Kater_720x480.jpg");
                                    image.setLargeImageUrl(IMAGE_SRC+"Kater_1200x800.jpg");
                                    kWelt.setImageURL(IMAGE_SRC+"Kater_720x480.jpg");
@@ -201,7 +195,7 @@ public class DekaAlexaSpeechlet implements Speechlet{
                                               
                                }else if(rubrik.equals("nachhaltige investments")){
                                    Rubrik nKol = hMap.get("nachhaltige investments");
-                                   speech.setText(nKol.getTitle()+". "+nKol.getText());
+                                   speech.setSsml("<speak>"+nKol.getTitle()+". "+nKol.getText()+ask+"</speak>");
                                    image.setSmallImageUrl(IMAGE_SRC+"NachhaltigeInvestments_720x480.jpg");
                                    image.setLargeImageUrl(IMAGE_SRC+"NachhaltigeInvestments_1200x800.jpg");
                                    nKol.setImageURL(IMAGE_SRC+"NachhaltigeInvestments_720x480.jpg");
@@ -211,7 +205,8 @@ public class DekaAlexaSpeechlet implements Speechlet{
                                    session.setAttribute(SESSION_RUBRIK, nKol.getType());
                                              
                                }else if(!hMap.containsKey(rubrik)){
-                                   speech.setText("Die Rubrik "+rubrik+" existiert nicht.");
+                                   speech.setSsml("<speak>"+"Die Rubrik "+rubrik+" existiert nicht."+"</speak>");
+                                   return SpeechletResponse.newTellResponse(speech);
                                }
                         }
                        return SpeechletResponse.newAskResponse(speech, createRepromptSpeech(), card);
@@ -219,7 +214,7 @@ public class DekaAlexaSpeechlet implements Speechlet{
            
             private SpeechletResponse handleShowRubrik(){
                         PlainTextOutputSpeech speech = new PlainTextOutputSpeech();
-                        speech.setText("Folgende Rubriken sind verf�gbar: "+themen);
+                        speech.setText("Folgende Rubriken sind verfügbar: "+themen+"Bitte wählen Sie eine Rubrik aus.");
                         return SpeechletResponse.newAskResponse(speech, createRepromptSpeech());
                        
             }
@@ -229,19 +224,26 @@ public class DekaAlexaSpeechlet implements Speechlet{
                         Rubrik rubrik = (Rubrik) hMap.get(session.getAttribute(SESSION_RUBRIK));
                         speech.setText(rubrik.getTitle()+". "+rubrik.getText());
                        
-                        return SpeechletResponse.newAskResponse(speech, createRepromptSpeech());
+                        return SpeechletResponse.newTellResponse(speech);
+            }
+            
+            
+            private SpeechletResponse unhandledIntent(){
+            	PlainTextOutputSpeech speech = new PlainTextOutputSpeech();
+            	speech.setText("Frag Alexa um Hilfe.");
+            	return SpeechletResponse.newAskResponse(speech, createRepromptSpeech());
             }
            
             private SpeechletResponse handleStopIntent() {
                 PlainTextOutputSpeech speech = new PlainTextOutputSpeech();
-                speech.setText("auf wiedersehen.");
+                speech.setText("Auf wiedersehen");
                 return SpeechletResponse.newTellResponse(speech);
                           }
                        
                           
             private SpeechletResponse handleHelpIntent() {
                 PlainTextOutputSpeech speech = new PlainTextOutputSpeech();
-                speech.setText("Fragen Sie Alexa welche Rubriken es gibt.");
+                speech.setText("Fragen Sie Alexa welche Rubriken es gibt, um demnach ein auszuwählen.");
                 return SpeechletResponse.newAskResponse(speech, createRepromptSpeech());
                           }
            
@@ -276,8 +278,7 @@ public class DekaAlexaSpeechlet implements Speechlet{
             
             private void initHashMap(){
             	log.info("initHashMap Funktion aufgerufen!");
-                if(hMap.isEmpty()){
-	                log.info("HashMap ist leer");
+            	
 	            	HttpContent http = new HttpContent();
 	                String html = http.getContent("https://deka.de/privatkunden/im-fokus");
 	               
@@ -325,9 +326,6 @@ public class DekaAlexaSpeechlet implements Speechlet{
 	                    
 	                    //liste der gefundenen rubriken auf
 	                    themen=sb.toString();
-	            }else{
-                    log.info("HashMap bereits befuellt");
-                }
 
             }
             
@@ -336,10 +334,6 @@ public class DekaAlexaSpeechlet implements Speechlet{
             	if(dbClient==null){
             		log.info("dynamodb client wird erstellt");
                     dbClient = AmazonDynamoDBClientBuilder.defaultClient();
-            	}
-            	if(veranstaltung==null){
-            		log.info("veranstaltungintents objekt wird erstellt");
-            		veranstaltung = new VeranstaltungIntents(dbClient);
             	}
             }
 }
