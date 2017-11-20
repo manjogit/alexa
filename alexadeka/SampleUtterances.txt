@@ -1,0 +1,55 @@
+chooseRubrik ich wähle das Thema {rubrik}
+chooseRubrik wähle den artikel {rubrik}
+chooseRubrik thema {rubrik}
+chooseRubrik wähle {rubrik}
+chooseRubrik wähle das Thema {rubrik}
+chooseRubrik mehr informationen zum Thema {rubrik}
+chooseRubrik was gibt's neues bei {rubrik}
+chooseRubrik was gibt's bei {rubrik}
+chooseRubrik was gibt es bei {rubrik}
+chooseRubrik was gibt es neues bei {rubrik}
+chooseRubrik was gibt es beim thema {rubrik}
+chooseRubrik über das thema {rubrik}
+chooseRubrik nach der rubrik {rubrik}
+chooseRubrik nach {rubrik}
+chooseRubrik nach dem artikel {rubrik}
+chooseRubrik nach dem thema {rubrik}
+chooseRubrik nach der rubrik {rubrik}
+chooseRubrik wähle die rubrik {rubrik}
+chooseRubrik rubrik {rubrik}
+chooseRubrik und wähle {rubrik}
+chooseRubrik und wähle die rubrik {rubrik}
+chooseRubrik und wähle das thema {rubrik}
+showRubrik welche rubriken es gibt
+showRubrik welche rubriken gibt es
+showRubrik welche themen es gibt
+showRubrik was kann ich wählen
+showRubrik welche themen gibt es
+showRubrik liste die themen auf
+showRubrik wiederhole die themen
+showRubrik was kann man wählen
+showRubrik liste auf
+postFacebook poste auf facebook
+postFacebook poste den beitrag
+postFacebook poste den beitrag auf facebook
+postFacebook poste den beitrag über facebook
+postFacebook veröffentliche den beitrag
+postFacebook veröffentliche das thema
+postFacebook poste den artikel über facebook
+postFacebook poste den artikel
+postFacebook poste über facebook
+repeatRubrik wiederhole den text
+repeatRubrik erneut thema vorlesen
+repeatRubrik wiederholen
+repeatRubrik erneut vorlesen
+repeatRubrik erneut
+repeatRubrik bitte wiederholen
+AMAZON.HelpIntent wie funktionierst du
+AMAZON.HelpIntent was kann ich machen
+AMAZON.HelpIntent hilfe
+AMAZON.HelpIntent was kann ich fragen
+AMAZON.HelpIntent was kann man machen
+unhandledIntent keine ahnung
+unhandledIntent der die das
+unhandledIntent aber hallo
+unhandledIntent dings vom dach
