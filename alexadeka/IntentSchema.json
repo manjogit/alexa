@@ -1,0 +1,40 @@
+{
+  "intents": [
+    {
+      "slots": [
+        {
+          "name": "rubrik",
+          "type": "RUBRIKEN"
+        }
+      ],
+      "intent": "chooseRubrik"
+    },
+    {
+      "intent": "showRubrik"
+    },
+    {
+      "intent": "postFacebook"
+    },
+    {
+      "intent": "readRubrik"
+    },
+    {
+      "intent": "repeatRubrik"
+    },
+    {
+      "intent": "AMAZON.HelpIntent"
+    },
+    {
+      "intent": "AMAZON.StopIntent"
+    },
+    {
+      "intent": "AMAZON.NoIntent"
+    },
+    {
+      "intent": "AMAZON.YesIntent"
+    },
+    {
+      "intent": "unhandledIntent"
+    }
+  ]
+}
