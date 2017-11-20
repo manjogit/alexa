@@ -32,33 +32,23 @@ import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClientBuilder;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
  
 public class DekaAlexaSpeechlet implements Speechlet{
-            private static final String SESSION_RUBRIK = "rubrik";
-            private static final String INTENT_SLOT = "rubrik";
+			private static final String IMAGE_SRC = "https://s3-eu-west-1.amazonaws.com/dekabucket/";
             private static final String INTENT_RUBRIK = "chooseRubrik";
             private static final String INTENT_SHOW = "showRubrik";
-            private static final String INTENT_REPEAT = "repeatRubrik";
-            private static final String INTENT_POST_FACE = "postFacebook";
-            private static final String INTENT_PAUSE = "handlePause";
-            private static final String INTENT_VERANST = "handleVeranstaltung";
-            private static final String INTENT_VERANST_FRAGE = "handleVeranstaltungsFrage";
-            private static final String INTENT_VERANST_WITZ = "handleWitz";
+            private static final String UNHANDLED = "unhandledIntent";
             private static final Logger log = Logger.getLogger(DekaAlexaSpeechlet.class);
             private static final String[] WELLCOMES = {
             											"Willkommen bei der Deka Anleger Welt."
-            											,"Deka Anleger Welt."
-            											,"Willkommen."
-            											,"Willkommen, Sie k�nnen gerne fragen welche Rubriken es gibt."
+            											,"Willkommen. Welche Rubrik möchten Sie hören?"
             										  };
             
             private static final String CHECK_USER = "checkUser"; 
-            private static final String IMAGE_SRC = "https://s3-eu-west-1.amazonaws.com/dekabucket/";
 
             //moeglicherweit simpledateformat auslagern, da diese klasse am vortag erstellt wurde und intent aufruf am naechsten tag
             private SimpleDateFormat format = new SimpleDateFormat("yyyyMMdd");
-            private HashMap<String, Rubrik> hMap = new HashMap<String,Rubrik>();
-            private String themen;
+            private String themen = "Katers Welt, nachhaltige Investments und Zertifikate-Kolumne";
             private static AmazonDynamoDB dbClient;
-            private VeranstaltungIntents veranstaltung;
+            private BegriffIntents begriffIntents;
              
  
             public SpeechletResponse onIntent(IntentRequest arg0, Session arg1) throws SpeechletException {
@@ -69,43 +59,35 @@ public class DekaAlexaSpeechlet implements Speechlet{
                 log.info("INTENT: "+ intentName +" onIntent requestId="+arg0.getRequestId()+", sessionId="+arg1.getSessionId());
                 
                 if(INTENT_RUBRIK.equals(intentName)) {
-                        return handleChooseRubrik(intent,arg1);
+                        return begriffIntents.handleBegriffIntent(intent,arg1);
                 } else if(INTENT_SHOW.equals(intentName)) {
                         return handleShowRubrik();
-                } else if(INTENT_VERANST_FRAGE.equals(intentName)){
-                		return veranstaltung.handleVeranstaltungsFrage();
-                } else if(INTENT_VERANST_WITZ.equals(intentName)){
-                		return veranstaltung.handleWitz();
-                } else if (INTENT_VERANST.equals(intentName)){
-                		return veranstaltung.handleVeranstaltung(intent,arg1);
-                } else if (INTENT_REPEAT.equals(intentName)) {
-                        return handleRepeatRubrik(arg1);
-                } else if (INTENT_POST_FACE.equals(intentName)) {
-                        return handleFacebookPost(arg1);
                 } else if ("AMAZON.HelpIntent".equals(intentName)) {
                         return handleHelpIntent();
                 } else if ("AMAZON.StopIntent".equals(intentName)) {
                         return handleStopIntent();
-                } else if (INTENT_PAUSE.equals(intentName)){ 
-                		return handleStopIntent();
                 } else if ("AMAZON.CancelIntent".equals(intentName)){
                 		return handleStopIntent();
+                } else if ("AMAZON.NoIntent".equals(intentName)){
+                		return handleStopIntent();
+                } else if (UNHANDLED.equals(intentName)){
+            			return unhandledIntent();
                 } else {
-                        throw new SpeechletException("Invalid Intent");
+                        return unhandledIntent();
                 }
             }
  
             public SpeechletResponse onLaunch(LaunchRequest arg0, Session arg1) throws SpeechletException {
                         // TODO Auto-generated method stub
                 log.info("onLaunch requestId="+arg0.getRequestId()+", sessionId="+arg1.getSessionId());
-                int random = (int) (Math.random()*4);
+                int random = (int) (Math.random()*(WELLCOMES.length-1));
                 SsmlOutputSpeech speech = new SsmlOutputSpeech();
                 //pruefen ob neuer user
                 if(arg1.getAttribute(CHECK_USER).equals("0")){
                 
                 	speech.setSsml("<speak><audio src=\"https://s3-eu-west-1.amazonaws.com/dekabucket/deka_alexa.mp3\" />"
-                					+ "Willkommen bei der Deka Anleger Welt. Sie k�nnen aus einen der folgenden Rubriken w�hlen: "+themen+" Falls Sie den Artikel ueber Facebook "
-                					+ "teilen m�chten, sagen Sie einfach: poste den Artikel.</speak>");
+                					+ "Willkommen bei der Deka Anleger Welt. Folgende Rubriken sind verfügbar: "+themen +" Falls Sie den Artikel über Facebook "
+                					+ "teilen möchten, sagen Sie einfach: poste den Artikel. Welche Rubrik möchten Sie hören?</speak>");
                 	
                     StandardCard card = new StandardCard();
                     Image image = new Image();
@@ -161,185 +143,54 @@ public class DekaAlexaSpeechlet implements Speechlet{
            
             private Reprompt createRepromptSpeech() {
                 PlainTextOutputSpeech repromptSpeech = new PlainTextOutputSpeech();
-                repromptSpeech.setText("Frag Alexa um Hilfe, falls du nicht weiter weisst.");
+                repromptSpeech.setText("Welche Rubrik möchten Sie wählen? oder Fragen Sie Alexa um Hilfe.");
                 Reprompt reprompt = new Reprompt();
                 reprompt.setOutputSpeech(repromptSpeech);
                 return reprompt;
                           }
              
            
-            private SpeechletResponse handleChooseRubrik(Intent intent, Session session){
-                        PlainTextOutputSpeech speech = new PlainTextOutputSpeech();
-                        StandardCard card = new StandardCard();
-                        Image image = new Image();
-                       
-                        if(intent.getSlot(INTENT_SLOT).getValue() == null){
-                               speech.setText("ich habe nicht verstanden welche rubrik sie gewaehlt haben");
-                        }else{
-                               String rubrik = intent.getSlot(INTENT_SLOT).getValue().toString().toLowerCase();
-                               if(rubrik.equals("zertifikate kolumne")){
-                                   Rubrik zKol = hMap.get("zertifikate-kolumne");
-                                   speech.setText(zKol.getTitle()+". "+zKol.getText());
-                                   image.setSmallImageUrl(IMAGE_SRC+"Masri_720x480.jpg");
-                                   image.setLargeImageUrl(IMAGE_SRC+"Masri_1200x800.jpg");
-                                   zKol.setImageURL(IMAGE_SRC+"Masri_720x480.jpg");
-                                   card.setTitle(zKol.getTitle());
-                                   card.setText(zKol.getTopic());
-                                   card.setImage(image);
-                                   session.setAttribute(SESSION_RUBRIK, zKol.getType());
-                                              
-                               }else if(rubrik.equals("katers welt")){
-                                   Rubrik kWelt = hMap.get("katers welt");
-                                   speech.setText(kWelt.getTitle()+". "+kWelt.getText());
-                                   image.setSmallImageUrl(IMAGE_SRC+"Kater_720x480.jpg");
-                                   image.setLargeImageUrl(IMAGE_SRC+"Kater_1200x800.jpg");
-                                   kWelt.setImageURL(IMAGE_SRC+"Kater_720x480.jpg");
-                                   card.setTitle(kWelt.getTitle());
-                                   card.setText(kWelt.getTopic());
-                                   card.setImage(image);
-                                   session.setAttribute(SESSION_RUBRIK, kWelt.getType());
-                                              
-                               }else if(rubrik.equals("nachhaltige investments")){
-                                   Rubrik nKol = hMap.get("nachhaltige investments");
-                                   speech.setText(nKol.getTitle()+". "+nKol.getText());
-                                   image.setSmallImageUrl(IMAGE_SRC+"NachhaltigeInvestments_720x480.jpg");
-                                   image.setLargeImageUrl(IMAGE_SRC+"NachhaltigeInvestments_1200x800.jpg");
-                                   nKol.setImageURL(IMAGE_SRC+"NachhaltigeInvestments_720x480.jpg");
-                                   card.setTitle(nKol.getTitle());
-                                   card.setText(nKol.getTopic());
-                                   card.setImage(image);
-                                   session.setAttribute(SESSION_RUBRIK, nKol.getType());
-                                             
-                               }else if(!hMap.containsKey(rubrik)){
-                                   speech.setText("Die Rubrik "+rubrik+" existiert nicht.");
-                               }
-                        }
-                       return SpeechletResponse.newAskResponse(speech, createRepromptSpeech(), card);
-            }
            
             private SpeechletResponse handleShowRubrik(){
-                        PlainTextOutputSpeech speech = new PlainTextOutputSpeech();
-                        speech.setText("Folgende Rubriken sind verf�gbar: "+themen);
+                        SsmlOutputSpeech speech = new SsmlOutputSpeech();
+                        speech.setSsml("<speak>Folgende Rubriken sind verfügbar: Katers Welt, nachhaltige Investments und Zertifikate-Kolumne. Bitte wählen Sie eine Rubrik aus.</speak>");
                         return SpeechletResponse.newAskResponse(speech, createRepromptSpeech());
                        
             }
            
-            private SpeechletResponse handleRepeatRubrik(Session session){
-                        PlainTextOutputSpeech speech = new PlainTextOutputSpeech();
-                        Rubrik rubrik = (Rubrik) hMap.get(session.getAttribute(SESSION_RUBRIK));
-                        speech.setText(rubrik.getTitle()+". "+rubrik.getText());
-                       
-                        return SpeechletResponse.newAskResponse(speech, createRepromptSpeech());
+            
+            
+            private SpeechletResponse unhandledIntent(){
+            	PlainTextOutputSpeech speech = new PlainTextOutputSpeech();
+            	speech.setText("Frag Alexa um Hilfe.");
+            	return SpeechletResponse.newAskResponse(speech, createRepromptSpeech());
             }
            
             private SpeechletResponse handleStopIntent() {
                 PlainTextOutputSpeech speech = new PlainTextOutputSpeech();
-                speech.setText("auf wiedersehen.");
+                speech.setText("Auf wiedersehen");
                 return SpeechletResponse.newTellResponse(speech);
                           }
                        
                           
             private SpeechletResponse handleHelpIntent() {
                 PlainTextOutputSpeech speech = new PlainTextOutputSpeech();
-                speech.setText("Fragen Sie Alexa welche Rubriken es gibt.");
+                speech.setText("Fragen Sie Alexa welche Rubriken es gibt, um demnach ein auszuwählen.");
                 return SpeechletResponse.newAskResponse(speech, createRepromptSpeech());
                           }
            
-            private SpeechletResponse handleFacebookPost(Session session){
-                        PlainTextOutputSpeech speech = new PlainTextOutputSpeech();
-                        String accessToken = session.getUser().getAccessToken();
-                        String message;
-                        
-                        if(session.getAttribute(SESSION_RUBRIK) == null){
-                        	speech.setText("Sie haben noch kein Thema gewaehlt. Bitte waehlen Sie eins.");
-                        	
-                        	return SpeechletResponse.newAskResponse(speech, createRepromptSpeech());
-                        }
-                       
-                        if(accessToken == null){
-                            log.info("AccessToken noch nicht vergeben.");
-                            message = "Bitte oeffnen Sie die Alexa App, um ihren Facebook Account zu verlinken.";
-                            LinkAccountCard card = new LinkAccountCard();
-                            speech.setText(message);
-                                  
-                            return SpeechletResponse.newTellResponse(speech, card);
-                        }else{
-                            Rubrik rubrik = (Rubrik) hMap.get(session.getAttribute(SESSION_RUBRIK));
-                            FacebookPost facebookPost = new FacebookPost(accessToken,rubrik);
-                            message = facebookPost.postBeitrag();
-                            speech.setText(message);
-                                                        
-                            return SpeechletResponse.newTellResponse(speech);
-                        }
-            }
             
-            
-            private void initHashMap(){
-            	log.info("initHashMap Funktion aufgerufen!");
-                if(hMap.isEmpty()){
-	                log.info("HashMap ist leer");
-	            	HttpContent http = new HttpContent();
-	                String html = http.getContent("https://deka.de/privatkunden/im-fokus");
-	               
-	                Document doc = Jsoup.parse(html);
-	                Element divTopics1 = doc.getElementById("anker6357911");
-	                Element divTopics2 = doc.getElementById("anker6357912");
-	               
-	               
-	                Elements links1 = divTopics1.getElementsByTag("a");
-	                Elements links2 = divTopics2.getElementsByTag("a");
-	               
-	               
 
-	                for(int i=0; i<links1.size(); i++){
-	                
-	                	String link = "https://deka.de"+links1.get(i).attr("href");
-	                    String html1 = http.getContent(link);
-	                    String type = links1.get(i).attr("title").toLowerCase();
-	                    
-	                    if(type.matches("^nach.*|^zert.*|^kate.*")){
-	                    	hMap.put(type, new Rubrik(html1,type,link));
-	                    }
-	                }
-	               
-	               
-	                for(int i=0; i<links2.size(); i++){
-	                    String link = "https://deka.de"+links2.get(i).attr("href");
-	                    String html1 = http.getContent(link);
-	                    String type = links2.get(i).attr("title").toLowerCase();
-	                    
-	                    if(type.matches("^nach.*|^zert.*|^kate.*")){
-	                    	hMap.put(type, new Rubrik(html1,type,link));
-	                    }
-	                }
-	               
-	                    StringBuilder sb = new StringBuilder();
-	                    Set<String> set = hMap.keySet();
-	                    Iterator<String> i = set.iterator();
-	                    
-	                    while(i.hasNext()){
-	                    sb.append(i.next() + ", ");
-	                    }
-	                    
-	                    sb.replace(sb.lastIndexOf(","), sb.lastIndexOf(",")+1, ".");
-	                    
-	                    //liste der gefundenen rubriken auf
-	                    themen=sb.toString();
-	            }else{
-                    log.info("HashMap bereits befuellt");
-                }
-
-            }
             
             private void initialize(){
-            	initHashMap();
             	if(dbClient==null){
             		log.info("dynamodb client wird erstellt");
                     dbClient = AmazonDynamoDBClientBuilder.defaultClient();
             	}
-            	if(veranstaltung==null){
-            		log.info("veranstaltungintents objekt wird erstellt");
-            		veranstaltung = new VeranstaltungIntents(dbClient);
+            	
+            	if(begriffIntents==null){
+            		log.info("BegriffIntents Objekt wird angelegt!");
+            		begriffIntents = new BegriffIntents(dbClient);
             	}
             }
 }
