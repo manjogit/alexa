@@ -1,17 +1,14 @@
 package dekaskill;
  
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Set;
+import java.util.Properties;
 
 import org.apache.log4j.Logger;
-import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
-import org.jsoup.nodes.Element;
-import org.jsoup.select.Elements;
- 
 import com.amazon.speech.slu.Intent;
 import com.amazon.speech.speechlet.IntentRequest;
 import com.amazon.speech.speechlet.LaunchRequest;
@@ -22,7 +19,6 @@ import com.amazon.speech.speechlet.Speechlet;
 import com.amazon.speech.speechlet.SpeechletException;
 import com.amazon.speech.speechlet.SpeechletResponse;
 import com.amazon.speech.ui.Image;
-import com.amazon.speech.ui.LinkAccountCard;
 import com.amazon.speech.ui.PlainTextOutputSpeech;
 import com.amazon.speech.ui.Reprompt;
 import com.amazon.speech.ui.SsmlOutputSpeech;
@@ -30,6 +26,11 @@ import com.amazon.speech.ui.StandardCard;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClientBuilder;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
+import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.AmazonS3ClientBuilder;
+import com.amazonaws.services.s3.model.GetObjectRequest;
+import com.amazonaws.services.s3.model.S3Object;
+
  
 public class DekaAlexaSpeechlet implements Speechlet{
 			private static final String IMAGE_SRC = "https://s3-eu-west-1.amazonaws.com/dekabucket/";
@@ -37,19 +38,16 @@ public class DekaAlexaSpeechlet implements Speechlet{
             private static final String INTENT_SHOW = "showRubrik";
             private static final String UNHANDLED = "unhandledIntent";
             private static final Logger log = Logger.getLogger(DekaAlexaSpeechlet.class);
-            private static final String[] WELLCOMES = {
-            											"Willkommen bei der Deka Anleger Welt."
-            											,"Willkommen. Welche Rubrik möchten Sie hören?"
-            										  };
-            
             private static final String CHECK_USER = "checkUser"; 
-
             //moeglicherweit simpledateformat auslagern, da diese klasse am vortag erstellt wurde und intent aufruf am naechsten tag
             private SimpleDateFormat format = new SimpleDateFormat("yyyyMMdd");
-            private String themen = "Katers Welt, nachhaltige Investments und Zertifikate-Kolumne";
             private static AmazonDynamoDB dbClient;
+    		private static AmazonS3 s3Client;
             private BegriffIntents begriffIntents;
-             
+    		private Properties props;
+    		
+            
+          
  
             public SpeechletResponse onIntent(IntentRequest arg0, Session arg1) throws SpeechletException {
                         // TODO Auto-generated method stub
@@ -80,27 +78,27 @@ public class DekaAlexaSpeechlet implements Speechlet{
             public SpeechletResponse onLaunch(LaunchRequest arg0, Session arg1) throws SpeechletException {
                         // TODO Auto-generated method stub
                 log.info("onLaunch requestId="+arg0.getRequestId()+", sessionId="+arg1.getSessionId());
-                int random = (int) (Math.random()*(WELLCOMES.length-1));
+                String[] wellcomes = props.get("begruessung").toString().split(";");
+                
+                int random = (int) (Math.random()*(wellcomes.length-1));
                 SsmlOutputSpeech speech = new SsmlOutputSpeech();
                 //pruefen ob neuer user
                 if(arg1.getAttribute(CHECK_USER).equals("0")){
                 
-                	speech.setSsml("<speak><audio src=\"https://s3-eu-west-1.amazonaws.com/dekabucket/deka_alexa.mp3\" />"
-                					+ "Willkommen bei der Deka Anleger Welt. Folgende Rubriken sind verfügbar: "+themen +" Falls Sie den Artikel über Facebook "
-                					+ "teilen möchten, sagen Sie einfach: poste den Artikel. Welche Rubrik möchten Sie hören?</speak>");
+                	speech.setSsml(props.getProperty("firstwellcome"));
                 	
                     StandardCard card = new StandardCard();
                     Image image = new Image();
                     card.setText("Willkommen!");
                     card.setTitle("Deka");
-                    image.setSmallImageUrl(IMAGE_SRC+"deka_720x480.png");
-                    image.setLargeImageUrl(IMAGE_SRC+"deka_1200x800.png");
+                    image.setSmallImageUrl(IMAGE_SRC+props.getProperty("dekaimageklein"));
+                    image.setLargeImageUrl(IMAGE_SRC+props.getProperty("dekaimagegross"));
                     card.setImage(image);
                     return SpeechletResponse.newAskResponse(speech, createRepromptSpeech(),card);
                     
                 }else{
                 
-                	speech.setSsml("<speak><audio src=\"https://s3-eu-west-1.amazonaws.com/dekabucket/deka_alexa.mp3\" />"+WELLCOMES[random]+"</speak>");
+                	speech.setSsml("<speak><audio src=\"https://s3-eu-west-1.amazonaws.com/dekabucket/deka_alexa.mp3\" />"+wellcomes[random]+"</speak>");
                     return SpeechletResponse.newAskResponse(speech, createRepromptSpeech());
                 }
             }
@@ -123,7 +121,14 @@ public class DekaAlexaSpeechlet implements Speechlet{
                 //clients anlegen, hashmpap befuellung usw.
                 initialize();
                   
-                
+                //properties laden
+                try {
+					props = getPropertiesFromS3("dekabucket", "alexa.properties");
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+					log.info("Properties konnten nicht geladen werden.");
+				}
                 //reicht eine mapper instanz?
                 DynamoDBMapper mapper = new DynamoDBMapper(dbClient);
                 User userGet = mapper.load(user);
@@ -143,7 +148,7 @@ public class DekaAlexaSpeechlet implements Speechlet{
            
             private Reprompt createRepromptSpeech() {
                 PlainTextOutputSpeech repromptSpeech = new PlainTextOutputSpeech();
-                repromptSpeech.setText("Welche Rubrik möchten Sie wählen? oder Fragen Sie Alexa um Hilfe.");
+                repromptSpeech.setText(props.getProperty("reprompt"));
                 Reprompt reprompt = new Reprompt();
                 reprompt.setOutputSpeech(repromptSpeech);
                 return reprompt;
@@ -152,9 +157,9 @@ public class DekaAlexaSpeechlet implements Speechlet{
            
            
             private SpeechletResponse handleShowRubrik(){
-                        SsmlOutputSpeech speech = new SsmlOutputSpeech();
-                        speech.setSsml("<speak>Folgende Rubriken sind verfügbar: Katers Welt, nachhaltige Investments und Zertifikate-Kolumne. Bitte wählen Sie eine Rubrik aus.</speak>");
-                        return SpeechletResponse.newAskResponse(speech, createRepromptSpeech());
+            	PlainTextOutputSpeech speech = new PlainTextOutputSpeech();
+                speech.setText(props.getProperty("verfuegbar"));
+                return SpeechletResponse.newAskResponse(speech, createRepromptSpeech());
                        
             }
            
@@ -162,20 +167,20 @@ public class DekaAlexaSpeechlet implements Speechlet{
             
             private SpeechletResponse unhandledIntent(){
             	PlainTextOutputSpeech speech = new PlainTextOutputSpeech();
-            	speech.setText("Frag Alexa um Hilfe.");
+            	speech.setText(props.getProperty("hilfe"));
             	return SpeechletResponse.newAskResponse(speech, createRepromptSpeech());
             }
            
             private SpeechletResponse handleStopIntent() {
                 PlainTextOutputSpeech speech = new PlainTextOutputSpeech();
-                speech.setText("Auf wiedersehen");
+                speech.setText(props.getProperty("abschied"));
                 return SpeechletResponse.newTellResponse(speech);
                           }
                        
                           
             private SpeechletResponse handleHelpIntent() {
                 PlainTextOutputSpeech speech = new PlainTextOutputSpeech();
-                speech.setText("Fragen Sie Alexa welche Rubriken es gibt, um demnach ein auszuwählen.");
+                speech.setText(props.getProperty("hilfe"));
                 return SpeechletResponse.newAskResponse(speech, createRepromptSpeech());
                           }
            
@@ -187,10 +192,22 @@ public class DekaAlexaSpeechlet implements Speechlet{
             		log.info("dynamodb client wird erstellt");
                     dbClient = AmazonDynamoDBClientBuilder.defaultClient();
             	}
-            	
+            	if(s3Client==null){
+            		log.info("s3 Client wird erstellt");
+            		s3Client =  AmazonS3ClientBuilder.defaultClient();
+            	}
             	if(begriffIntents==null){
             		log.info("BegriffIntents Objekt wird angelegt!");
             		begriffIntents = new BegriffIntents(dbClient);
             	}
+            }
+            
+            
+            private Properties getPropertiesFromS3(String bucket, String file) throws IOException{
+            	Properties properties = new Properties();
+            	S3Object s3Object = s3Client.getObject(new GetObjectRequest(bucket, file));
+            	InputStream iStream = s3Object.getObjectContent();
+            	properties.load(new InputStreamReader(iStream,StandardCharsets.UTF_8));
+            	return properties;
             }
 }
